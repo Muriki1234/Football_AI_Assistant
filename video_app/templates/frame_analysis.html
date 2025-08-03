@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>足球视频单帧分析</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            padding-top: 20px;
+            background-color: #f8f9fa;
+        }
+        .main-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .result-container {
+            margin-top: 30px;
+            display: none;
+        }
+        .image-container {
+            position: relative;
+            margin-top: 20px;
+            overflow: hidden;
+            border-radius: 5px;
+            box-shadow: 0 0 5px rgba(0,0,0,0.2);
+        }
+        .image-container img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        
+        /* 球员框样式 - 精致的「」形状效果 */
+        .player-box {
+            position: absolute;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-sizing: border-box;
+            background-color: transparent;
+            border: none;
+            transform: scale(1.05);
+            transform-origin: center;
+        }
+        
+        /* 左上角 */
+        .corner-top-left {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 20%;
+            height: 1px;
+            background-color: #00FFFF; /* 改为更鲜艳的青色 */
+            transition: all 0.3s ease;
+        }
+        
+        .corner-left-top {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 1px;
+            height: 20%;
+            background-color: #00FF00;
+            transition: all 0.3s ease;
+        }
+        
+        /* 右上角 */
+        .corner-top-right {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 20%;
+            height: 1px;
+            background-color: #00FF00;
+            transition: all 0.3s ease;
+        }
+        
+        .corner-right-top {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 1px;
+            height: 20%;
+            background-color: #00FF00;
+            transition: all 0.3s ease;
+        }
+        
+        /* 左下角 */
+        .corner-bottom-left {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 20%;
+            height: 1px;
+            background-color: #00FF00;
+            transition: all 0.3s ease;
+        }
+        
+        .corner-left-bottom {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 1px;
+            height: 20%;
+            background-color: #00FF00;
+            transition: all 0.3s ease;
+        }
+        
+        /* 右下角 */
+        .corner-bottom-right {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 20%;
+            height: 1px;
+            background-color: #00FF00;
+            transition: all 0.3s ease;
+        }
+        
+        .corner-right-bottom {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 1px;
+            height: 20%;
+            background-color: #00FF00;
+            transition: all 0.3s ease;
+        }
+        
+        /* 选中效果 - 添加动画效果 */
+        @keyframes selectedBoxAnimation {
+            0% { transform: scale(1.05); }
+            50% { transform: scale(1.20); }
+            100% { transform: scale(1.15); }
+        }
+        
+        .player-box.selected {
+            animation: selectedBoxAnimation 0.5s ease forwards;
+            z-index: 10; /* 确保选中的框显示在上面 */
+        }
+        
+        /* 选中状态的边框颜色 */
+        .player-box.selected .corner-top-left,
+        .player-box.selected .corner-left-top,
+        .player-box.selected .corner-top-right,
+        .player-box.selected .corner-right-top,
+        .player-box.selected .corner-bottom-left,
+        .player-box.selected .corner-left-bottom,
+        .player-box.selected .corner-bottom-right,
+        .player-box.selected .corner-right-bottom {
+            background-color: #FF9500; /* 明亮的橙色，更鲜艳 */
+        }
+        
+        /* 选中状态添加发光效果 */
+        .player-box.selected {
+            box-shadow: 0 0 15px rgba(255, 149, 0, 0.8); /* 匹配橙色的发光效果 */
+        }
+        
+        .player-label {
+            position: absolute;
+            background-color: rgba(0, 255, 0, 0.7);
+            color: white;
+            padding: 2px 5px;
+            font-size: 12px;
+            border-radius: 3px;
+        }
+        .player-label.selected {
+            background-color: rgba(255, 215, 0, 0.9);
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
+        }
+        .frame-selector {
+            margin-top: 15px;
+        }
+        .stats-container {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+        .player-info {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f0f8ff;
+            border-radius: 5px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container main-container">
+        <h1 class="text-center mb-4">足球视频单帧分析</h1>
+        
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">上传视频</h5>
+                        <form id="uploadForm" enctype="multipart/form-data">
+                            <div class="mb-3">
+                                <label for="videoFile" class="form-label">选择视频文件</label>
+                                <input class="form-control" type="file" id="videoFile" name="video" accept="video/*">
+                            </div>
+                            <div class="frame-selector mb-3" style="display: none;">
+                                <label for="timeSlider" class="form-label">选择时间点 <span id="currentTime">0.0</span>秒/<span id="totalDuration">0.0</span>秒</label>
+                                <input type="range" class="form-range" id="timeSlider" min="0" max="100" step="0.5" value="0">
+                                <div class="video-preview mt-3 mb-3" style="position: relative;">
+                                    <video id="videoPreview" style="width: 100%; display: none;" controls></video>
+                                    <canvas id="previewCanvas" style="width: 100%; display: none;"></canvas>
+                                    <div class="text-center" id="previewLoading">
+                                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                            <span class="visually-hidden">加载中...</span>
+                                        </div>
+                                        <span class="ms-2">加载预览...</span>
+                                    </div>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" id="prevTime">后退0.5秒</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" id="analyzeCurrentTime">分析当前时间点</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" id="nextTime">前进0.5秒</button>
+                                </div>
+                                <div class="mt-2 p-2 bg-light rounded text-center">
+                                    <span id="timeDebug" style="font-weight: bold; color: #0d6efd;">
+                                        当前选择的时间点: <span id="currentTimeDisplay">0.0</span>秒
+                                    </span>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary" id="uploadBtn">上传并分析</button>
+                        </form>
+                        
+                        <div class="loading mt-3">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">加载中...</span>
+                            </div>
+                            <p class="mt-2">正在处理，请稍候...</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="player-info">
+                    <h5>球员信息</h5>
+                    <div id="playerDetails">
+                        <p>点击图像中的球员框以查看详细信息</p>
+                    </div>
+                </div>
+                
+                <div class="stats-container">
+                    <h5>分析统计</h5>
+                    <ul id="statsInfo">
+                        <li>检测到的球员: <span id="playerCount">0</span></li>
+                        <li>检测到的裁判: <span id="refereeCount">0</span></li>
+                        <li>是否检测到球: <span id="ballDetected">否</span></li>
+                    </ul>
+                </div>
+                
+                <div class="card mt-4">
+                    <div class="card-body">
+                        <h5 class="card-title d-flex align-items-center">
+                            <img src="https://lh3.googleusercontent.com/JMrZ7ZgcbSOgNq7uLRzgIpodqYxIYTDUfkHLZKftxnXCODh0UHcvlNQiqxgXlZHnEuV51A=e14-rj-sc0xffffff-h130-w32" alt="Gemini Logo" style="height: 24px; margin-right: 8px;">
+                            Gemini AI 球员位置分析
+                        </h5>
+                        
+                        <div class="alert alert-info mb-3">
+                            <i class="bi bi-info-circle-fill me-2"></i>
+                            请先在右侧图像中<strong>点击选择一个球员</strong>，然后再使用AI分析功能。
+                        </div>
+                        
+                        <div id="selectedPlayerInfo" class="mb-3 p-2 border rounded bg-light" style="display: none;">
+                            <h6 class="mb-2">当前选中球员：</h6>
+                            <div class="d-flex justify-content-between">
+                                <span>球员ID: <strong id="selectedPlayerIdText">-</strong></span>
+                                <span>坐标: <strong id="selectedPlayerCoordinates">-</strong></span>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="aiPrompt" class="form-label">分析提示词 (自动生成)</label>
+                            <textarea class="form-control" id="aiPrompt" rows="3" readonly>请先选择一个球员...</textarea>
+                        </div>
+                        
+                        <button type="button" class="btn btn-primary" id="analyzeWithAI" disabled>
+                            <i class="bi bi-magic me-1"></i> AI分析球员位置
+                        </button>
+                        
+                        <div class="ai-loading mt-3" style="display: none;">
+                            <div class="d-flex align-items-center">
+                                <div class="spinner-border spinner-border-sm text-primary me-2" role="status">
+                                    <span class="visually-hidden">加载中...</span>
+                                </div>
+                                <span>AI分析中，请稍候...</span>
+                            </div>
+                        </div>
+                        
+                        <div class="ai-result mt-3" style="display: none;">
+                            <div class="card border-primary">
+                                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                                    <h6 class="mb-0">AI分析结果</h6>
+                                    <button class="btn btn-sm btn-outline-light" id="copyAnalysisBtn">
+                                        <i class="bi bi-clipboard"></i> 复制
+                                    </button>
+                                </div>
+                                <div class="card-body p-3">
+                                    <div class="analysis-content bg-light p-3 rounded" id="aiAnalysisResult" style="white-space: pre-wrap; max-height: 300px; overflow-y: auto;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="result-container">
+                    <h5>分析结果</h5>
+                    <div class="image-container">
+                        <img id="resultImage" src="" alt="分析结果">
+                        <div id="playerBoxes"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const uploadForm = document.getElementById('uploadForm');
+            const videoFile = document.getElementById('videoFile');
+            const uploadBtn = document.getElementById('uploadBtn');
+            const loading = document.querySelector('.loading');
+            const resultContainer = document.querySelector('.result-container');
+            const resultImage = document.getElementById('resultImage');
+            const playerBoxes = document.getElementById('playerBoxes');
+            const playerDetails = document.getElementById('playerDetails');
+            const playerInfo = document.querySelector('.player-info');
+            const frameSlider = document.getElementById('frameSlider');
+            const frameNumber = document.getElementById('frameNumber');
+            const totalFrames = document.getElementById('totalFrames');
+            const frameSelector = document.querySelector('.frame-selector');
+            const prevFrame = document.getElementById('prevFrame');
+            const nextFrame = document.getElementById('nextFrame');
+            const analyzeCurrentFrame = document.getElementById('analyzeCurrentFrame');
+            
+            // 统计信息元素
+            const playerCount = document.getElementById('playerCount');
+            const refereeCount = document.getElementById('refereeCount');
+            const ballDetected = document.getElementById('ballDetected');
+            
+            let videoObject = null;
+            let playersData = [];
+            let selectedPlayerId = null;
+            let currentTimeValue = 0;
+            
+            // 视频预览相关元素
+            const videoPreview = document.getElementById('videoPreview');
+            const previewCanvas = document.getElementById('previewCanvas');
+            const previewLoading = document.getElementById('previewLoading');
+            const previewCtx = previewCanvas.getContext('2d');
+            
+            // 当选择视频文件时
+            videoFile.addEventListener('change', function(e) {
+                if (this.files && this.files[0]) {
+                    const file = this.files[0];
+                    
+                    // 显示加载指示器
+                    previewLoading.style.display = 'block';
+                    videoPreview.style.display = 'none';
+                    previewCanvas.style.display = 'none';
+                    
+                    // 创建视频元素以获取时长
+                    const video = document.createElement('video');
+                    video.preload = 'metadata';
+                    video.onloadedmetadata = function() {
+                        // 视频加载完成后，显示时间选择器
+                        frameSelector.style.display = 'block';
+                        
+                        // 设置总时长
+                        const duration = video.duration;
+                        totalDuration.textContent = duration.toFixed(1);
+                        timeSlider.max = duration;
+                        timeSlider.value = (duration / 2).toFixed(1);
+                        currentTime.textContent = timeSlider.value;
+                        
+                        currentTimeValue = parseFloat(timeSlider.value);
+                        
+                        // 存储视频对象以供后续使用
+                        videoObject = video;
+                        
+                        // 设置视频预览
+                        videoPreview.src = URL.createObjectURL(file);
+                        videoPreview.style.display = 'block';
+                        previewLoading.style.display = 'none';
+                        
+                        // 加载完成后跳转到选定时间点
+                        videoPreview.onloadeddata = function() {
+                            updateVideoPreview(currentTimeValue);
+                        };
+                    };
+                    
+                    video.src = URL.createObjectURL(file);
+                }
+            });
+            
+            // 更新视频预览到指定时间点
+            function updateVideoPreview(timeInSeconds) {
+                if (!videoPreview.src) return;
+                
+                // 设置视频时间
+                videoPreview.currentTime = timeInSeconds;
+                
+                // 更新全局时间变量
+                currentTimeValue = timeInSeconds;
+                
+                // 更新时间显示
+                document.getElementById('currentTimeDisplay').textContent = timeInSeconds.toFixed(1);
+                
+                // 添加调试信息
+                console.log(`预览时间点: ${timeInSeconds.toFixed(3)}秒`);
+                
+                // 视频定位到指定时间后的事件
+                videoPreview.onseeked = function() {
+                    // 调整canvas大小以匹配视频
+                    previewCanvas.width = videoPreview.videoWidth;
+                    previewCanvas.height = videoPreview.videoHeight;
+                    
+                    // 在canvas上绘制当前帧
+                    previewCtx.drawImage(videoPreview, 0, 0, previewCanvas.width, previewCanvas.height);
+                    
+                    // 显示canvas，隐藏视频
+                    previewCanvas.style.display = 'block';
+                    videoPreview.style.display = 'none';
+                };
+            }
+            
+            // 时间选择器事件
+            timeSlider.addEventListener('input', function() {
+                const time = parseFloat(this.value);
+                currentTime.textContent = time.toFixed(1);
+                currentTimeValue = time;
+                updateVideoPreview(time);
+            });
+            
+            prevTime.addEventListener('click', function() {
+                const newTime = Math.max(0, currentTimeValue - 0.5);
+                timeSlider.value = newTime;
+                currentTime.textContent = newTime.toFixed(1);
+                updateVideoPreview(newTime);
+            });
+            
+            nextTime.addEventListener('click', function() {
+                const newTime = Math.min(parseFloat(timeSlider.max), currentTimeValue + 0.5);
+                timeSlider.value = newTime;
+                currentTime.textContent = newTime.toFixed(1);
+                updateVideoPreview(newTime);
+            });
+            
+            analyzeCurrentTime.addEventListener('click', function() {
+                analyzeFrame();
+            });
+            
+            // 表单提交处理
+            uploadForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                analyzeFrame();
+            });
+            
+            function analyzeFrame() {
+                if (!videoFile.files || !videoFile.files[0]) {
+                    alert('请先选择视频文件');
+                    return;
+                }
+                
+                // 显示加载状态
+                loading.style.display = 'block';
+                uploadBtn.disabled = true;
+                
+                // 准备表单数据
+                const formData = new FormData();
+                formData.append('video', videoFile.files[0]);
+                formData.append('time_in_seconds', currentTimeValue.toFixed(2));
+                
+                // 添加调试信息
+                console.log(`分析时间点: ${currentTimeValue.toFixed(2)}秒, 发送请求...`);
+                
+                // 发送请求
+                fetch('/analyze_frame', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // 更新UI显示结果
+                        resultContainer.style.display = 'block';
+                        resultImage.src = data.annotated_frame_url;
+                        
+                        // 显示分析的时间点
+                        console.log(`服务器分析的时间点: ${data.time_in_seconds}秒, 视频时长: ${data.video_duration}秒`);
+                        
+                        // 更新统计信息
+                        let playerCounter = 0;
+                        let refereeCounter = 0;
+                        let ballFound = false;
+                        
+                        data.predictions.forEach(pred => {
+                            if (pred.class === 'player') playerCounter++;
+                            else if (pred.class === 'referee') refereeCounter++;
+                            else if (pred.class === 'ball') ballFound = true;
+                        });
+                        
+                        playerCount.textContent = playerCounter;
+                        refereeCount.textContent = refereeCounter;
+                        ballDetected.textContent = ballFound ? '是' : '否';
+                        
+                        // 存储球员数据
+                        playersData = data.players_data;
+                        
+                        // 清除之前的选择
+                        selectedPlayerId = null;
+                        playerInfo.style.display = 'none';
+                        
+                        // 当图像加载完成后，添加交互式球员框
+                        resultImage.onload = function() {
+                            addPlayerBoxes(data.players_data, data.image_dimensions);
+                            
+                            // 显示Gemini AI分析结果
+                            if (data.gemini_analysis) {
+                                showGeminiAnalysis(data.gemini_analysis);
+                            }
+                        };
+                    } else {
+                        alert('分析失败: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('请求失败，请查看控制台了解详情');
+                })
+                .finally(() => {
+                    // 隐藏加载状态
+                    loading.style.display = 'none';
+                    uploadBtn.disabled = false;
+                });
+            }
+            
+            function addPlayerBoxes(players, dimensions) {
+                // 清除之前的球员框
+                playerBoxes.innerHTML = '';
+                
+                // 计算图像缩放比例
+                const imageWidth = resultImage.clientWidth;
+                const scaleX = imageWidth / dimensions.width;
+                const scaleY = scaleX; // 保持宽高比
+                
+                // 为每个球员添加交互式框
+                players.forEach(player => {
+                    
+                    const [x1, y1, x2, y2] = player.bbox;
+                    
+                    // 创建球员框
+                    const box = document.createElement('div');
+                    box.className = 'player-box';
+                    box.style.left = (x1 * scaleX) + 'px';
+                    box.style.top = (y1 * scaleY) + 'px';
+                    box.style.width = ((x2 - x1) * scaleX) + 'px';
+                    box.style.height = ((y2 - y1) * scaleY) + 'px';
+                    box.dataset.playerId = player.id;
+                    
+                    // 添加左上角元素
+                    const cornerTopLeft = document.createElement('div');
+                    cornerTopLeft.className = 'corner-top-left';
+                    box.appendChild(cornerTopLeft);
+                    
+                    const cornerLeftTop = document.createElement('div');
+                    cornerLeftTop.className = 'corner-left-top';
+                    box.appendChild(cornerLeftTop);
+                    
+                    // 添加右上角元素
+                    const cornerTopRight = document.createElement('div');
+                    cornerTopRight.className = 'corner-top-right';
+                    box.appendChild(cornerTopRight);
+                    
+                    const cornerRightTop = document.createElement('div');
+                    cornerRightTop.className = 'corner-right-top';
+                    box.appendChild(cornerRightTop);
+                    
+                    // 添加左下角元素
+                    const cornerBottomLeft = document.createElement('div');
+                    cornerBottomLeft.className = 'corner-bottom-left';
+                    box.appendChild(cornerBottomLeft);
+                    
+                    const cornerLeftBottom = document.createElement('div');
+                    cornerLeftBottom.className = 'corner-left-bottom';
+                    box.appendChild(cornerLeftBottom);
+                    
+                    // 添加右下角元素
+                    const cornerBottomRight = document.createElement('div');
+                    cornerBottomRight.className = 'corner-bottom-right';
+                    box.appendChild(cornerBottomRight);
+                    
+                    const cornerRightBottom = document.createElement('div');
+                    cornerRightBottom.className = 'corner-right-bottom';
+                    box.appendChild(cornerRightBottom);
+                    
+                    // 添加点击事件
+                    box.addEventListener('click', function() {
+                        selectPlayer(player.id);
+                    });
+                    
+                    playerBoxes.appendChild(box);
+                });
+            }
+            
+            function selectPlayer(playerId) {
+                // 取消之前的选择
+                const prevSelectedBoxes = document.querySelectorAll('.player-box.selected');
+                
+                prevSelectedBoxes.forEach(box => box.classList.remove('selected'));
+                
+                if (selectedPlayerId === playerId) {
+                    // 如果点击的是已选中的球员，则取消选择
+                    selectedPlayerId = null;
+                    playerInfo.style.display = 'none';
+                    
+                    // 更新AI分析部分
+                    document.getElementById('selectedPlayerInfo').style.display = 'none';
+                    document.getElementById('aiPrompt').value = '请先选择一个球员...';
+                    analyzeWithAIBtn.disabled = true;
+                } else {
+                    // 选中新的球员
+                    selectedPlayerId = playerId;
+                    
+                    // 高亮显示选中的球员框
+                    const selectedBox = document.querySelector(`.player-box[data-player-id="${playerId}"]`);
+                    
+                    if (selectedBox) {
+                        // 添加选中类并确保它在视图中可见
+                        selectedBox.classList.add('selected');
+                        
+                        // 提高选中框的z-index，确保它显示在其他框的上面
+                        selectedBox.style.zIndex = '10';
+                        
+                        // 恢复其他框的z-index
+                        document.querySelectorAll('.player-box:not(.selected)').forEach(box => {
+                            box.style.zIndex = '1';
+                        });
+                    }
+                    
+                    // 显示球员信息 - 使用更简洁的设计
+                    const player = playersData.find(p => p.id === playerId);
+                    if (player) {
+                        // 计算球员框的尺寸
+                        const width = player.bbox[2] - player.bbox[0];
+                        const height = player.bbox[3] - player.bbox[1];
+                        
+                        playerDetails.innerHTML = `
+                            <div class="card border-primary">
+                                <div class="card-header bg-primary text-white py-1">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <strong>球员 #${player.id}</strong>
+                                        <small>已选中</small>
+                                    </div>
+                                </div>
+                                <div class="card-body py-2">
+                                    <div class="row g-2">
+                                        <div class="col-6">
+                                            <small class="d-block">
+                                                <strong>位置:</strong><br>
+                                                X: ${player.center[0].toFixed(1)}<br>
+                                                Y: ${player.center[1].toFixed(1)}
+                                            </small>
+                                        </div>
+                                        <div class="col-6">
+                                            <small class="d-block">
+                                                <strong>尺寸:</strong><br>
+                                                宽: ${(player.bbox[2] - player.bbox[0]).toFixed(1)}<br>
+                                                高: ${(player.bbox[3] - player.bbox[1]).toFixed(1)}
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        playerInfo.style.display = 'block';
+                        
+                        // 更新AI分析部分
+                        document.getElementById('selectedPlayerInfo').style.display = 'block';
+                        document.getElementById('selectedPlayerIdText').textContent = player.id;
+                        document.getElementById('selectedPlayerCoordinates').textContent = 
+                            `(${player.center[0].toFixed(1)}, ${player.center[1].toFixed(1)})`;
+                        
+                        // 更新提示词
+                        const fixedPrompt = `在视频中第${currentTimeValue.toFixed(2)}秒中 坐标(${player.center[0]},${player.center[1]})所对应的球员，在整个视频里分析一下是踢什么位置的？`;
+                        document.getElementById('aiPrompt').value = fixedPrompt;
+                        
+                        // 启用AI分析按钮
+                        analyzeWithAIBtn.disabled = false;
+                    }
+                }
+            }
+            
+            // Gemini AI 分析功能
+            const analyzeWithAIBtn = document.getElementById('analyzeWithAI');
+            const aiPrompt = document.getElementById('aiPrompt');
+            const aiLoading = document.querySelector('.ai-loading');
+            const aiResult = document.querySelector('.ai-result');
+            const aiAnalysisResult = document.getElementById('aiAnalysisResult');
+            
+            // 显示Gemini分析结果
+            function showGeminiAnalysis(response) {
+                aiResult.style.display = 'block';
+                
+                // 获取当前选中的球员信息
+                const player = playersData.find(p => p.id === selectedPlayerId);
+                
+                // 创建格式化分析结果
+                let formattedResult = '';
+                
+                // 添加分析信息头部
+                formattedResult += `⚽ 球员位置分析\n`;
+                formattedResult += `------------------------\n`;
+                formattedResult += `时间点: ${currentTimeValue.toFixed(2)}秒\n`;
+                
+                if (player) {
+                    formattedResult += `球员ID: #${player.id}\n`;
+                    formattedResult += `坐标: (${player.center[0].toFixed(1)}, ${player.center[1].toFixed(1)})\n`;
+                }
+                
+                // 安全处理video_duration字段
+                if (response.video_duration !== undefined && response.video_duration !== null) {
+                    formattedResult += `视频时长: ${response.video_duration.toFixed(1)}秒\n`;
+                }
+                
+                formattedResult += `------------------------\n\n`;
+                formattedResult += `分析结果:\n${response.analysis || '无分析结果'}`;
+                
+                aiAnalysisResult.textContent = formattedResult;
+                
+                // 自动滚动到底部
+                aiAnalysisResult.scrollTop = aiAnalysisResult.scrollHeight;
+                
+                // 重置UI状态
+                aiPrompt.disabled = true;
+            }
+            
+            // 保存上传的视频文件
+            let uploadedVideoFile = null;
+            
+            // 更新视频文件保存逻辑
+            videoFile.addEventListener('change', function(e) {
+                if (this.files && this.files[0]) {
+                    uploadedVideoFile = this.files[0];
+                }
+            });
+            
+            // AI分析按钮点击事件
+            analyzeWithAIBtn.addEventListener('click', function() {
+                if (!uploadedVideoFile) {
+                    alert('请先上传视频文件');
+                    return;
+                }
+                
+                // 检查是否选择了球员
+                if (selectedPlayerId === null) {
+                    alert('请先点击图像中的一个球员框进行选择');
+                    return;
+                }
+                
+                // 获取选中球员的信息
+                const selectedPlayer = playersData.find(p => p.id === selectedPlayerId);
+                if (!selectedPlayer) {
+                    alert('无法获取选中球员的信息');
+                    return;
+                }
+                
+                // 构建固定的问题模板
+                const fixedPrompt = `在视频中第${currentTimeValue.toFixed(2)}秒中 坐标(${selectedPlayer.center[0]},${selectedPlayer.center[1]})所对应的球员，在整个视频里分析一下是踢什么位置的？`;
+                
+                // 显示问题模板（仅供用户参考）
+                aiPrompt.value = fixedPrompt;
+                aiPrompt.disabled = true;
+                
+                // 显示加载状态
+                aiLoading.style.display = 'block';
+                aiResult.style.display = 'none';
+                analyzeWithAIBtn.disabled = true;
+                
+                // 添加分析中状态提示
+                const analyzeButtonText = analyzeWithAIBtn.innerHTML;
+                analyzeWithAIBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>AI分析中...';
+                
+                // 准备表单数据
+                const formData = new FormData();
+                formData.append('video', uploadedVideoFile);
+                formData.append('prompt', fixedPrompt);
+                formData.append('time_in_seconds', currentTimeValue.toFixed(2));
+                formData.append('player_coordinates', JSON.stringify(selectedPlayer.center));
+                
+                // 发送请求
+                fetch('/analyze_with_gemini', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showGeminiAnalysis(data);
+                    } else {
+                        alert('AI分析失败: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('请求失败，请查看控制台了解详情');
+                })
+                .finally(() => {
+                    // 隐藏加载状态
+                    aiLoading.style.display = 'none';
+                    
+                    // 恢复按钮状态
+                    analyzeWithAIBtn.disabled = false;
+                    analyzeWithAIBtn.innerHTML = '<i class="bi bi-magic me-1"></i> AI分析球员位置';
+                    
+                    // 滚动到分析结果
+                    if (aiResult.style.display !== 'none') {
+                        aiResult.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

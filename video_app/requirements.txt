@@ -1,0 +1,8 @@
+flask==2.0.1
+opencv-python==4.5.3.56
+numpy==1.21.2
+roboflow==0.2.29
+supabase==0.7.1
+google-generativeai==0.3.1
+Pillow==9.0.0
+python-dotenv==0.19.1
