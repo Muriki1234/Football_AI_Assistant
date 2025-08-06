@@ -3,6 +3,7 @@ import cv2
 import numpy as np
 import json
 from flask import Flask, request, render_template, jsonify
+from flask_cors import CORS
 from roboflow import Roboflow
 from supabase import create_client, Client
 import tempfile
@@ -17,6 +18,14 @@ genai.configure(api_key=GEMINI_API_KEY)
 # 使用临时文件夹代替永久存储
 TEMP_FOLDER = tempfile.mkdtemp()
 app = Flask(__name__)
+# 配置CORS
+CORS(app, resources={
+    r"/*": {
+        "origins": ["http://localhost:3000"],
+        "methods": ["GET", "POST", "OPTIONS"],
+        "allow_headers": ["Content-Type"]
+    }
+})
 
 # Roboflow 模型配置
 API_KEY = "ZhDcdtTQB4CrMZQXcSTo"
