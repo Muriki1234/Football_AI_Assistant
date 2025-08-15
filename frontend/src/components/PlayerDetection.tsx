@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+ import React, { useState } from 'react';
+import { CheckCircle, ArrowLeft } from 'lucide-react';
+import '../styles/PlayerDetection.css';
 
 interface Player {
   id: number;
@@ -12,15 +14,61 @@ interface PlayerDetectionProps {
   imageDimensions: { width: number; height: number };
   onPlayerSelected: (playerId: number, coordinates: { x: number, y: number }) => void;
   isAnalyzing: boolean;
+  onBack?: () => void; // 添加返回按钮回调
 }
 
 const PlayerDetection: React.FC<PlayerDetectionProps> = (props) => {
+  // 添加淡入动画的样式
+  const fadeInAnimation = `
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(-5px); }
+    }
+    
+    @keyframes loading {
+      0% { width: 0%; }
+      100% { width: 100%; }
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .new-loading-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      background-color: rgba(255, 255, 255, 0.9);
+      border-radius: 8px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    .new-loading-spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid rgba(22, 163, 74, 0.3);
+      border-top: 4px solid #16a34a;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    
+    .new-loading-text {
+      margin-top: 1rem;
+      font-size: 1rem;
+      color: #16a34a;
+      font-weight: 500;
+    }
+  `;
   const { 
     annotatedFrameUrl,
     playersData,
     imageDimensions,
     onPlayerSelected,
-    isAnalyzing
+    isAnalyzing,
+    onBack
   } = props;
   
   console.log('PlayerDetection props:', {
@@ -107,28 +155,64 @@ const PlayerDetection: React.FC<PlayerDetectionProps> = (props) => {
 
   return (
     <div className="player-detection">
-      <style>
-        {`
-        @keyframes pulse {
-          0% { opacity: 0.7; }
-          50% { opacity: 1; border-color: #00FF00; }
-          100% { opacity: 0.7; }
-        }
-        `}
-      </style>
+      <style>{fadeInAnimation}</style>
+      <button
+  onClick={() => {
+    if (onBack) {
+      onBack();
+    } else {
+      window.location.pathname = '/frameselector';
+    }
+  }}
+  className="flex items-center space-x-2 text-green-600 hover:text-green-700 mb-8 transition-colors"
+>
+  <ArrowLeft className="w-5 h-5" />
+  <span>返回选择帧数</span>
+</button>
+      
+      {/* Progress Bar */}
+      <div className="flex items-center justify-center mb-12">
+        <div className="flex items-center space-x-4">
+          <div className="flex items-center">
+            <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center">
+              <CheckCircle className="w-5 h-5 text-white" />
+            </div>
+            <span className="ml-2 text-green-600 font-medium">上传视频</span>
+          </div>
+          <div className="w-12 h-0.5 bg-green-500"></div>
+          <div className="flex items-center">
+            <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center">
+              <CheckCircle className="w-5 h-5 text-white" />
+            </div>
+            <span className="ml-2 text-green-600 font-medium">选择帧数</span>
+          </div>
+          <div className="w-12 h-0.5 bg-green-500"></div>
+          <div className="flex items-center">
+            <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center">
+               <span className="text-white text-sm font-semibold">3</span>
+            </div>
+            <span className="ml-2 text-green-600 font-medium">选择球员</span>
+          </div>
+          <div className="w-12 h-0.5 bg-gray-300"></div>
+          <div className="flex items-center">
+            <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
+              <span className="text-gray-500 text-sm font-semibold">4</span>
+            </div>
+            <span className="ml-2 text-gray-500">AI分析</span>
+          </div>
+        </div>
+      </div>
+      
       <h2>检测结果</h2>
       
       {annotatedFrameUrl ? (
-        <div className="detection-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <div 
-            className="frame-container" 
-            style={{ 
-              position: 'relative', 
-              display: 'inline-block',
-              maxWidth: '100%',
-              border: '2px solid green' // 调试边框
-            }}
-          >
+        <div className="detection-container">
+          {isAnalyzing && (
+            <div className="loading-bar">
+              <div className="loading-progress"></div>
+            </div>
+          )}
+          <div className="frame-container">
             <img 
               src={annotatedFrameUrl} 
               alt="Annotated Frame" 
@@ -137,23 +221,11 @@ const PlayerDetection: React.FC<PlayerDetectionProps> = (props) => {
                 setImageLoaded(true);
                 console.log("Image loaded with dimensions:", imageDimensions);
               }}
-              style={{ 
-                display: 'block',
-                maxWidth: '100%', 
-                cursor: isAnalyzing ? 'wait' : 'pointer',
-                border: '1px solid #ccc'
-              }}
+              style={{ cursor: isAnalyzing ? 'wait' : 'pointer' }}
             />
             
             {/* 球员框层 */}
-            <div style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: '100%',
-              pointerEvents: 'none'
-            }}>
+            <div className="player-boxes-layer">
               {playersData && playersData.length > 0 && playersData.map(player => {
                 const [x1, y1, x2, y2] = player.bbox;
                 const isSelected = selectedPlayerId === player.id;
@@ -174,10 +246,8 @@ const PlayerDetection: React.FC<PlayerDetectionProps> = (props) => {
                   displayHeight = (y2 - y1) * scaleY;
                 }
                 
-                // 定义边框颜色和样式
-                const borderColor = isSelected ? '#FF8C00' : '#FFFFFF'; // 选中时为橙色，未选中为白色
-                const borderWidth = isSelected ? 3 : 2;
-                const scaleFactor = isSelected ? 1.08 : 1;
+                // 定义边框样式 - 增强选中时的放大效果
+                const scaleFactor = isSelected ? 1.25 : 1;
                 
                 return (
                   <div
@@ -189,11 +259,11 @@ const PlayerDetection: React.FC<PlayerDetectionProps> = (props) => {
                       width: `${displayWidth}px`,
                       height: `${displayHeight}px`,
                       backgroundColor: 'transparent',
-                      zIndex: 20,
                       pointerEvents: 'auto',
                       cursor: 'pointer',
-                      transition: 'all 0.25s ease-out',
+                      transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
                       transform: `scale(${scaleFactor})`,
+                      zIndex: isSelected ? 30 : 20
                     }}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -227,10 +297,9 @@ const PlayerDetection: React.FC<PlayerDetectionProps> = (props) => {
                             width: `${finalSize}px`,
                             height: `${finalSize}px`,
                             border: 'none',
-                            borderTop: `1px solid ${isSelected ? '#FF8C00' : '#00FF00'}`,
-                            borderLeft: `1px solid ${isSelected ? '#FF8C00' : '#00FF00'}`,
-                            transition: 'all 0.25s ease-out',
-                            boxShadow: isSelected ? '0 0 2px rgba(255, 140, 0, 0.8)' : 'none'
+                            borderTop: `${isSelected ? '2px' : '1px'} solid ${isSelected ? '#FF8C00' : '#00FF00'}`,
+                            borderLeft: `${isSelected ? '2px' : '1px'} solid ${isSelected ? '#FF8C00' : '#00FF00'}`,
+                            transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
                           }}></div>
                           
                           {/* 右上角标记 - 只有右边和上边 */}
@@ -241,10 +310,9 @@ const PlayerDetection: React.FC<PlayerDetectionProps> = (props) => {
                             width: `${finalSize}px`,
                             height: `${finalSize}px`,
                             border: 'none',
-                            borderTop: `1px solid ${isSelected ? '#FF8C00' : '#00FF00'}`,
-                            borderRight: `1px solid ${isSelected ? '#FF8C00' : '#00FF00'}`,
-                            transition: 'all 0.25s ease-out',
-                            boxShadow: isSelected ? '0 0 2px rgba(255, 140, 0, 0.8)' : 'none'
+                            borderTop: `${isSelected ? '2px' : '1px'} solid ${isSelected ? '#FF8C00' : '#00FF00'}`,
+                            borderRight: `${isSelected ? '2px' : '1px'} solid ${isSelected ? '#FF8C00' : '#00FF00'}`,
+                            transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
                           }}></div>
                           
                           {/* 左下角标记 - 只有左边和下边 */}
@@ -255,10 +323,9 @@ const PlayerDetection: React.FC<PlayerDetectionProps> = (props) => {
                             width: `${finalSize}px`,
                             height: `${finalSize}px`,
                             border: 'none',
-                            borderBottom: `1px solid ${isSelected ? '#FF8C00' : '#00FF00'}`,
-                            borderLeft: `1px solid ${isSelected ? '#FF8C00' : '#00FF00'}`,
-                            transition: 'all 0.25s ease-out',
-                            boxShadow: isSelected ? '0 0 2px rgba(255, 140, 0, 0.8)' : 'none'
+                            borderBottom: `${isSelected ? '2px' : '1px'} solid ${isSelected ? '#FF8C00' : '#00FF00'}`,
+                            borderLeft: `${isSelected ? '2px' : '1px'} solid ${isSelected ? '#FF8C00' : '#00FF00'}`,
+                            transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
                           }}></div>
                           
                           {/* 右下角标记 - 只有右边和下边 */}
@@ -269,35 +336,29 @@ const PlayerDetection: React.FC<PlayerDetectionProps> = (props) => {
                             width: `${finalSize}px`,
                             height: `${finalSize}px`,
                             border: 'none',
-                            borderBottom: `1px solid ${isSelected ? '#FF8C00' : '#00FF00'}`,
-                            borderRight: `1px solid ${isSelected ? '#FF8C00' : '#00FF00'}`,
-                            transition: 'all 0.25s ease-out',
-                            boxShadow: isSelected ? '0 0 2px rgba(255, 140, 0, 0.8)' : 'none'
+                            borderBottom: `${isSelected ? '2px' : '1px'} solid ${isSelected ? '#FF8C00' : '#00FF00'}`,
+                            borderRight: `${isSelected ? '2px' : '1px'} solid ${isSelected ? '#FF8C00' : '#00FF00'}`,
+                            transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
                           }}></div>
                         </>
                       );
                     })()}
                     
                     {isSelected && (
-                      <div style={{
-                        position: 'absolute',
-                        top: '-30px',
-                        left: '50%',
-                        transform: 'translateX(-50%)',
-                        background: 'rgba(255, 140, 0, 0.7)', // 半透明背景
-                        color: 'white',
-                        padding: '4px 10px',
-                        fontSize: '13px',
-                        fontWeight: 'bold',
-                        borderRadius: '4px',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-                        whiteSpace: 'nowrap',
-                        textShadow: '0 1px 2px rgba(0,0,0,0.3)',
-                        pointerEvents: 'none', // 允许点击穿透
-                        zIndex: 10, // 确保不会阻挡其他元素
-                        backdropFilter: 'blur(1px)', // 轻微模糊效果，增强可读性
-                        opacity: 0.85 // 整体透明度
-                      }}>
+                      <div 
+                        className="player-label"
+                        style={{
+                          backgroundColor: 'rgba(255, 140, 0, 0.85)',
+                          color: 'white',
+                          padding: '4px 8px',
+                          borderRadius: '4px',
+                          fontWeight: 'bold',
+                          boxShadow: '0 2px 6px rgba(0, 0, 0, 0.3)',
+                          transform: 'translateY(-5px)',
+                          animation: 'fadeIn 0.3s ease-out',
+                          border: '3px solid orange'
+                        }}
+                      >
                         球员 #{player.id}
                       </div>
                     )}
@@ -307,54 +368,45 @@ const PlayerDetection: React.FC<PlayerDetectionProps> = (props) => {
             </div>
             
             <div className="image-overlay">
-              {isAnalyzing && <div className="loading-overlay">分析中...</div>}
+              {isAnalyzing && (
+            <div className="new-loading-container">
+              <div className="new-loading-spinner"></div>
+              <p className="new-loading-text">正在分析视频，请稍候...</p>
+            </div>
+          )}
             </div>
           </div>
           
                       <div className="players-list">
-                      <h3>检测到的球员</h3>
-                      {!playersData ? (
-                        <p>等待分析结果...</p>
-                      ) : playersData.length === 0 ? (
-                        <p>未检测到球员</p>
-                      ) : (
-                        <ul>
-                          {playersData.map(player => (
-                            <li 
-                              key={player.id}
-                              className={selectedPlayerId === player.id ? 'selected' : ''}
-                              onClick={() => handlePlayerClick(player.id)}
-                              style={{
-                                position: 'relative',
-                                overflow: 'hidden'
-                              }}
-                            >
-                              {selectedPlayerId === player.id && (
-                                <span style={{
-                                  position: 'absolute',
-                                  top: 0,
-                                  left: 0,
-                                  right: 0,
-                                  bottom: 0,
-                                  border: '2px solid #00FF00',
-                                  borderRadius: '4px',
-                                  pointerEvents: 'none',
-                                  animation: 'pulse 1.5s infinite'
-                                }}></span>
-                              )}
-                              球员 #{player.id} 
-                              <span className="coordinates">
-                                位置: ({player.center[0]}, {player.center[1]})
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                      <div className="instructions">
-                        <p>点击图像或列表中的球员进行选择</p>
-                        <p>选择球员后可进行AI分析</p>
+                        <h3>检测到的球员</h3>
+                        {!playersData ? (
+                          <p>等待分析结果...</p>
+                        ) : playersData.length === 0 ? (
+                          <p>未检测到球员</p>
+                        ) : (
+                          <ul>
+                            {playersData.map(player => (
+                              <li 
+                                key={player.id}
+                                className={selectedPlayerId === player.id ? 'selected' : ''}
+                                onClick={() => handlePlayerClick(player.id)}
+                              >
+                                {selectedPlayerId === player.id && (
+                                  <span className="selection-indicator"></span>
+                                )}
+                                球员 #{player.id} 
+                                <span className="coordinates">
+                                  位置: ({player.center[0]}, {player.center[1]})
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                        <div className="instructions">
+                          <p>点击图像或列表中的球员进行选择</p>
+                          <p>选择球员后可进行AI分析</p>
+                        </div>
                       </div>
-                    </div>
         </div>
       ) : (
         <div className="no-detection">

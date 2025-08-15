@@ -335,92 +335,83 @@ def gemini_analysis():
 @app.route("/analyze_with_gemini", methods=["POST"])
 def analyze_with_gemini():
     """使用Gemini AI分析视频中特定时间点的特定球员"""
-    if request.method == "POST":
-        file = request.files.get("video")
-        if not file:
-            return jsonify({"error": "No file uploaded", "success": False}), 400
+    file = request.files.get("video")
+    if not file:
+        return jsonify({"error": "No file uploaded", "success": False}), 400
 
-        # 获取时间点和球员坐标
-        time_in_seconds = request.form.get("time_in_seconds")
-        player_coordinates_str = request.form.get("player_coordinates")
-        prompt = request.form.get("prompt")
-        
-        # 验证必要参数
-        if not time_in_seconds or not player_coordinates_str or not prompt:
-            return jsonify({
-                "error": "缺少必要参数：时间点、球员坐标或提示词", 
-                "success": False
-            }), 400
-            
-        try:
-            # 解析球员坐标
-            player_coordinates = json.loads(player_coordinates_str)
-            time_in_seconds = float(time_in_seconds)
-        except (ValueError, json.JSONDecodeError) as e:
-            return jsonify({
-                "error": f"参数格式错误: {str(e)}", 
-                "success": False
-            }), 400
-        
-        # 生成唯一的文件名
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"{timestamp}_{file.filename}"
-        
-        # 使用临时文件路径
-        temp_input_path = os.path.join(TEMP_FOLDER, filename)
-        file.save(temp_input_path)
+    time_in_seconds = request.form.get("time_in_seconds")
+    player_coordinates_str = request.form.get("player_coordinates")
+    prompt = request.form.get("prompt")
 
+    if not time_in_seconds or not player_coordinates_str or not prompt:
+        return jsonify({
+            "error": "缺少必要参数：时间点、球员坐标或提示词",
+            "success": False
+        }), 400
+
+    try:
+        player_coordinates = json.loads(player_coordinates_str)
+        time_in_seconds = float(time_in_seconds)
+    except (ValueError, json.JSONDecodeError) as e:
+        return jsonify({"error": f"参数格式错误: {str(e)}", "success": False}), 400
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"{timestamp}_{file.filename}"
+    temp_input_path = os.path.join(TEMP_FOLDER, filename)
+    file.save(temp_input_path)
+
+    try:
+        gemini_model = genai.GenerativeModel("gemini-1.5-flash")
+
+        # 读取视频二进制内容
+        with open(temp_input_path, "rb") as video_file:
+            video_bytes = video_file.read()
+
+        user_text = f"{prompt}\n时间点: {time_in_seconds} 秒\n球员坐标: {player_coordinates}"
+
+        # 传二进制视频
+        response = gemini_model.generate_content(
+            contents=[
+                {"role": "user", "parts": [
+                    {"text": user_text},
+                    {"inline_data": {"mime_type": "video/mp4", "data": video_bytes}}
+                ]}
+            ]
+        )
+
+        analysis_result = response.text if hasattr(response, "text") else str(response)
+
+        analysis_filename = f"{timestamp}_analysis.txt"
+        analysis_path = os.path.join(TEMP_FOLDER, analysis_filename)
+        with open(analysis_path, "w", encoding="utf-8") as f:
+            f.write(analysis_result)
+
+        supabase_path = f"gemini_analysis/{analysis_filename}"
         try:
-            # 创建GenerativeModel实例，使用1.5-flash模型
-            gemini_model = genai.GenerativeModel('gemini-1.5-flash')
-            
-            # 读取视频内容
-            with open(temp_input_path, "rb") as video_file:
-                video_data = video_file.read()
-            
-            # 使用Gemini AI分析视频
-            response = gemini_model.generate_content(
-                contents=[prompt, {"mime_type": "video/mp4", "data": video_data}]
-            )
-            
-            # 保存分析结果到文件（可选）
-            analysis_filename = f"{timestamp}_analysis.txt"
-            analysis_path = os.path.join(TEMP_FOLDER, analysis_filename)
-            with open(analysis_path, "w", encoding="utf-8") as f:
-                f.write(response.text)
-            
-            # 上传分析结果到Supabase（可选）
-            supabase_path = f"gemini_analysis/{analysis_filename}"
-            try:
-                analysis_url = upload_to_supabase(analysis_path, supabase_path)
-            except Exception as e:
-                print(f"上传分析结果时出错: {e}")
-                analysis_url = None
-            
-            # 返回分析结果
-            result = {
-                "success": True,
-                "analysis": response.text,
-                "timestamp": timestamp
-            }
-            
-            if 'analysis_url' in locals() and analysis_url:
-                result["analysis_url"] = analysis_url
-            
-            return jsonify(result)
-            
+            analysis_url = upload_to_supabase(analysis_path, supabase_path)
         except Exception as e:
-            print(f"Gemini AI分析过程中出错: {e}")
-            return jsonify({
-                "error": f"分析失败: {str(e)}",
-                "success": False
-            }), 500
-            
-        finally:
-            # 清理临时文件
-            cleanup_file(temp_input_path)
-            if 'analysis_path' in locals():
-                cleanup_file(analysis_path)
+            print(f"上传分析结果失败: {e}")
+            analysis_url = None
+
+        result = {
+            "success": True,
+            "analysis": analysis_result,
+            "timestamp": timestamp
+        }
+        if analysis_url:
+            result["analysis_url"] = analysis_url
+
+        return jsonify(result)
+
+    except Exception as e:
+        print(f"Gemini AI分析过程中出错: {e}")
+        return jsonify({"error": f"分析失败: {str(e)}", "success": False}), 500
+
+    finally:
+        cleanup_file(temp_input_path)
+        if 'analysis_path' in locals():
+            cleanup_file(analysis_path)
+
 
 @app.route("/health")
 def health_check():
