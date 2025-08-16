@@ -5,14 +5,14 @@ interface FrameSelectorProps {
   videoUrl: string;
   onTimeSelected: (timeInSeconds: number) => void;
   onBack: () => void;
-  onContinue: () => void;
+  onContinue: () => Promise<void>; // 父组件分析函数，返回 Promise
 }
 
-const FrameSelector: React.FC<FrameSelectorProps> = ({ 
-  videoUrl, 
-  onTimeSelected, 
+const FrameSelector: React.FC<FrameSelectorProps> = ({
+  videoUrl,
+  onTimeSelected,
   onBack,
-  onContinue
+  onContinue,
 }) => {
   const [videoDuration, setVideoDuration] = useState<number>(0);
   const [selectedTime, setSelectedTime] = useState<number>(0);
@@ -21,83 +21,88 @@ const FrameSelector: React.FC<FrameSelectorProps> = ({
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  useEffect(() => {
-    if (!isPlaying) {
-      onTimeSelected(selectedTime);
-    }
-  }, [selectedTime, isPlaying, onTimeSelected]);
-
+  // 处理视频加载
   useEffect(() => {
     if (videoRef.current) {
       const video = videoRef.current;
-      
+
       const handleLoadedMetadata = () => {
         setVideoDuration(video.duration);
-        // 默认选择视频中间时间点
         const middleTime = video.duration / 2;
         setSelectedTime(middleTime);
         video.currentTime = middleTime;
       };
-      
+
       const handleTimeUpdate = () => {
         if (isPlaying) {
           setSelectedTime(video.currentTime);
         }
       };
-      
+
       video.addEventListener('loadedmetadata', handleLoadedMetadata);
       video.addEventListener('timeupdate', handleTimeUpdate);
-      
+
       return () => {
         video.removeEventListener('loadedmetadata', handleLoadedMetadata);
         video.removeEventListener('timeupdate', handleTimeUpdate);
       };
     }
-  }, [videoUrl, onTimeSelected, isPlaying]);
+  }, [videoUrl, isPlaying]);
 
   const handleTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const time = parseFloat(e.target.value);
     setSelectedTime(time);
-    
-    if (videoRef.current) {
-      videoRef.current.currentTime = time;
-    }
+    if (videoRef.current) videoRef.current.currentTime = time;
+    onTimeSelected(time);
   };
 
   const handlePlayPause = () => {
-    if (videoRef.current) {
-      if (isPlaying) {
-        videoRef.current.pause();
-      } else {
-        videoRef.current.play();
-      }
-      setIsPlaying(!isPlaying);
+    if (!videoRef.current) return;
+    if (isPlaying) {
+      videoRef.current.pause();
+      onTimeSelected(videoRef.current.currentTime);
+    } else {
+      videoRef.current.play();
     }
+    setIsPlaying(!isPlaying);
   };
 
-  const formatTime = (seconds: number): string => {
+  const formatTime = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = Math.floor(seconds % 60);
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
-  const handleContinue = () => {
+  // 点击使用此帧进行分析
+  const handleContinueClick = async () => {
     setIsLoading(true);
     setUploadProgress(0);
-    
-    // 模拟加载进度
+
+    // 模拟 4 秒内进度到 80%
     const interval = setInterval(() => {
-      setUploadProgress((prevProgress) => {
-        if (prevProgress >= 100) {
+      setUploadProgress((prev) => {
+        if (prev >= 80) {
           clearInterval(interval);
-          setIsLoading(false);
-          onTimeSelected(selectedTime);
-          onContinue();
-          return 100;
+          return 80;
         }
-        return prevProgress + 10;
+        return prev + 2; // 每 100ms 增加 2%，4秒到80%
       });
-    }, 300);
+    }, 100);
+
+    try {
+      // 等待父组件分析完成
+      await onContinue();
+
+      // 分析完成，显示 100%
+      setUploadProgress(100);
+
+      setTimeout(() => {
+        setIsLoading(false);
+      }, 300); // 给用户一点缓冲
+    } catch (err) {
+      console.error(err);
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -116,8 +121,6 @@ const FrameSelector: React.FC<FrameSelectorProps> = ({
           <p className="text-xl text-gray-600">选择最佳时间点进行分析</p>
         </div>
 
-      
-
         {/* Progress Bar */}
         <div className="flex items-center justify-center mb-12">
           <div className="flex items-center space-x-4">
@@ -135,12 +138,12 @@ const FrameSelector: React.FC<FrameSelectorProps> = ({
               <span className="ml-2 text-green-600 font-medium">选择帧数</span>
             </div>
             <div className="w-12 h-0.5 bg-gray-300"></div>
-          <div className="flex items-center">
-            <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
-               <span className="text-gray-500 text-sm font-semibold">3</span>
+            <div className="flex items-center">
+              <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
+                <span className="text-gray-500 text-sm font-semibold">3</span>
+              </div>
+              <span className="ml-2 text-gray-500 font-medium">选择球员</span>
             </div>
-            <span className="ml-2 text-gray-500 font-medium">选择球员</span>
-          </div>
             <div className="w-12 h-0.5 bg-gray-300"></div>
             <div className="flex items-center">
               <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
@@ -151,7 +154,6 @@ const FrameSelector: React.FC<FrameSelectorProps> = ({
           </div>
         </div>
 
-        {/* Video Preview */}
         {isLoading ? (
           <div className="text-center py-12">
             <div className="w-20 h-20 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
@@ -173,9 +175,7 @@ const FrameSelector: React.FC<FrameSelectorProps> = ({
               </div>
               <p className="text-gray-600 mt-2">{uploadProgress}% 已完成</p>
             </div>
-            {uploadProgress === 100 && (
-              <p className="text-green-600 font-medium">正在跳转到AI分析...</p>
-            )}
+            {uploadProgress === 100 && <p className="text-green-600 font-medium">正在跳转...</p>}
           </div>
         ) : (
           <div className="bg-white rounded-2xl shadow-xl p-8 mb-8">
@@ -222,7 +222,7 @@ const FrameSelector: React.FC<FrameSelectorProps> = ({
                   {isPlaying ? '暂停' : '播放'}
                 </button>
                 <button
-                  onClick={handleContinue}
+                  onClick={handleContinueClick}
                   className="bg-green-600 hover:bg-green-700 text-white px-8 py-2 rounded-lg font-semibold transition-colors"
                 >
                   使用此帧进行分析
@@ -232,7 +232,6 @@ const FrameSelector: React.FC<FrameSelectorProps> = ({
           </div>
         )}
 
-        {/* Tips */}
         <div className="bg-blue-50 rounded-xl p-6">
           <h4 className="font-bold text-blue-900 mb-3">选择帧数提示:</h4>
           <ul className="text-blue-800 space-y-2">

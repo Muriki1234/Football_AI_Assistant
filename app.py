@@ -11,8 +11,11 @@ import shutil
 from datetime import datetime
 import google.generativeai as genai
 
+from dotenv import load_dotenv
+load_dotenv()
+
 # 配置Gemini API
-GEMINI_API_KEY = "AIzaSyBEy1LWdeVRqN9NgI7KqlDSgU84kRQVrno"
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 genai.configure(api_key=GEMINI_API_KEY)
 
 # 使用临时文件夹代替永久存储
@@ -28,7 +31,7 @@ CORS(app, resources={
 })
 
 # Roboflow 模型配置
-API_KEY = "ZhDcdtTQB4CrMZQXcSTo"
+API_KEY = os.getenv("ROBOFLOW_API_KEY")
 MODEL_ID = "football-players-detection-3zvbc-lkn9q"
 MODEL_VERSION = 1
 
@@ -37,8 +40,8 @@ project = rf.workspace().project(MODEL_ID)
 model = project.version(MODEL_VERSION).model
 
 # Supabase 配置
-SUPABASE_URL = "https://bmidrgduagptwiuutyxq.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJtaWRyZ2R1YWdwdHdpdXV0eXhxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTEwNzEyODQsImV4cCI6MjA2NjY0NzI4NH0.mGIHsWsV4dvpiMyTUTLDQ1G3b6arTZpPTEpyLShwvDg"
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 BUCKET_NAME = "videos"
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)

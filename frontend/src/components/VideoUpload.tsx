@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { ArrowLeft } from 'lucide-react';
 
 interface VideoUploadProps {
   onVideoUpload: (data: { file: File; videoUrl: string }) => void;
@@ -19,7 +20,7 @@ const VideoUpload: React.FC<VideoUploadProps> = ({
 
   // 支持的视频格式
   const supportedFormats = ['mp4', 'avi', 'mov', 'wmv', 'flv'];
-  const maxFileSize = 100 * 1024 * 1024; // 100MB
+ 
 
   const validateFile = (file: File): string | null => {
     console.log('验证文件:', {
@@ -41,9 +42,7 @@ const VideoUpload: React.FC<VideoUploadProps> = ({
     }
 
     // 检查文件大小
-    if (file.size > maxFileSize) {
-      return `文件大小不能超过 ${Math.round(maxFileSize / 1024 / 1024)}MB`;
-    }
+
 
     if (file.size === 0) {
       return '文件为空，请选择有效的视频文件';
@@ -52,62 +51,71 @@ const VideoUpload: React.FC<VideoUploadProps> = ({
     return null;
   };
 
-  const handleFileSelect = async (file: File) => {
-    setError(null);
-    setIsValidating(true);
+const handleFileSelect = async (file: File) => {
+  setError(null);
+  setIsValidating(true);
 
-    try {
-      // 验证文件
-      const validationError = validateFile(file);
-      if (validationError) {
-        setError(validationError);
-        setIsValidating(false);
-        return;
-      }
-
-      setSelectedFile(file);
-
-      // 创建视频元素来验证文件是否可以播放
-      const video = document.createElement('video');
-      const url = URL.createObjectURL(file);
-      
-      const validateVideo = new Promise<void>((resolve, reject) => {
-        video.onloadedmetadata = () => {
-          console.log('视频验证成功:', {
-            duration: video.duration,
-            videoWidth: video.videoWidth,
-            videoHeight: video.videoHeight
-          });
-          URL.revokeObjectURL(url);
-          resolve();
-        };
-        
-        video.onerror = () => {
-          console.error('视频验证失败');
-          URL.revokeObjectURL(url);
-          reject(new Error('无法播放此视频文件，请检查文件是否损坏'));
-        };
-        
-        // 设置超时
-        setTimeout(() => {
-          URL.revokeObjectURL(url);
-          reject(new Error('视频验证超时'));
-        }, 5000);
-        
-        video.src = url;
-      });
-
-      await validateVideo;
-      console.log('文件验证完成，准备上传');
-      
-    } catch (err) {
-      console.error('文件验证错误:', err);
-      setError(err instanceof Error ? err.message : '文件验证失败');
-      setSelectedFile(null);
-    } finally {
+  try {
+    const validationError = validateFile(file);
+    if (validationError) {
+      setError(validationError);
       setIsValidating(false);
+      return;
     }
-  };
+
+    setSelectedFile(file);
+
+    // 验证视频可播放性（延长超时，且不立刻 revoke）
+    const video = document.createElement('video');
+    const url = URL.createObjectURL(file);
+
+    const validateVideo = new Promise<void>((resolve, reject) => {
+      let timeoutId: NodeJS.Timeout;
+
+      video.onloadedmetadata = () => {
+        console.log('视频验证成功:', {
+          duration: video.duration,
+          videoWidth: video.videoWidth,
+          videoHeight: video.videoHeight
+        });
+        clearTimeout(timeoutId);
+        resolve();
+      };
+
+      video.onerror = () => {
+        console.error('视频验证失败');
+        clearTimeout(timeoutId);
+        reject(new Error('无法播放此视频文件，请检查文件是否损坏'));
+      };
+
+      // 延长超时
+      timeoutId = setTimeout(() => {
+        console.warn('视频验证超时，但保留文件供后端分析');
+        resolve(); // 不 reject，允许继续
+      }, 12000);
+
+      video.src = url;
+    });
+
+    await validateVideo;
+    console.log('文件验证完成，准备上传');
+
+    // 等到文件被替换或组件卸载时再 revoke
+    if (fileInputRef.current) {
+      fileInputRef.current.onchange = () => {
+        URL.revokeObjectURL(url);
+      };
+    }
+
+  } catch (err) {
+    console.error('文件验证错误:', err);
+    setError(err instanceof Error ? err.message : '文件验证失败');
+    // 不清空 selectedFile，允许继续上传
+  } finally {
+    setIsValidating(false);
+  }
+};
+
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
@@ -155,15 +163,55 @@ const VideoUpload: React.FC<VideoUploadProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-2xl p-8 w-full max-w-2xl">
-        <div className="text-center mb-8">
-          <h2 className="text-3xl font-bold text-gray-800 mb-2">上传足球视频</h2>
-          <p className="text-gray-600">
-            支持格式: {supportedFormats.map(f => f.toUpperCase()).join(', ')} | 最大文件大小: 100MB
-          </p>
+    <div className="min-h-screen py-8">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        {showBackButton && (
+          <button
+            onClick={onBack}
+            className="flex items-center space-x-2 text-green-600 hover:text-green-700 mb-8 transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5" />
+            <span>返回主页</span>
+          </button>
+        )}
+
+        <div className="text-center mb-12">
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">上传足球视频</h1>
+          <p className="text-xl text-gray-600">支持格式: {supportedFormats.map(f => f.toUpperCase()).join(', ')}</p>
         </div>
 
+ {/* Progress Bar */}
+        <div className="flex items-center justify-center mb-12">
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center">
+              <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center">
+                <span className="text-white text-sm font-semibold">1</span>
+                              </div>
+              <span className="ml-2 text-green-600 font-medium">上传视频</span>
+            </div>
+            <div className="w-12 h-0.5 bg-gray-300"></div>
+            <div className="flex items-center">
+              <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
+                <span className="text-gray-500 text-sm font-semibold">2</span>
+              </div>
+              <span className="ml-2 text-gray-500 font-medium">选择帧数</span>
+            </div>
+            <div className="w-12 h-0.5 bg-gray-300"></div>
+          <div className="flex items-center">
+            <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
+               <span className="text-gray-500 text-sm font-semibold">3</span>
+            </div>
+            <span className="ml-2 text-gray-500 font-medium">选择球员</span>
+          </div>
+            <div className="w-12 h-0.5 bg-gray-300"></div>
+            <div className="flex items-center">
+              <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
+                <span className="text-gray-500 text-sm font-semibold">4</span>
+              </div>
+              <span className="ml-2 text-gray-500">AI分析</span>
+            </div>
+          </div>
+        </div>
         {/* 调试信息 */}
         {selectedFile && (
           <div className="mb-6 p-4 bg-gray-100 rounded-lg">
@@ -179,7 +227,7 @@ const VideoUpload: React.FC<VideoUploadProps> = ({
 
         {/* 文件上传区域 */}
         <div
-          className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+          className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors mb-8 ${
             dragActive
               ? 'border-green-400 bg-green-50'
               : selectedFile
@@ -251,17 +299,9 @@ const VideoUpload: React.FC<VideoUploadProps> = ({
           </div>
         )}
 
+
         {/* 操作按钮 */}
-        <div className="flex justify-between mt-8">
-          {showBackButton && (
-            <button
-              onClick={onBack}
-              className="px-6 py-2 text-gray-600 hover:text-gray-800 transition-colors"
-            >
-              ← 返回
-            </button>
-          )}
-          
+        <div className="flex justify-center mt-8">
           <button
             onClick={handleContinue}
             disabled={!selectedFile || isValidating}
@@ -269,7 +309,7 @@ const VideoUpload: React.FC<VideoUploadProps> = ({
               selectedFile && !isValidating
                 ? 'bg-green-600 text-white hover:bg-green-700'
                 : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-            } ${!showBackButton ? 'ml-auto' : ''}`}
+            }`}
           >
             {isValidating ? '验证中...' : '继续分析'}
           </button>

@@ -187,11 +187,14 @@ input[type="file"] {
   padding: 20px;
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  
 }
+
 
 .player-detection h2, .gemini-analysis h2 {
   margin-bottom: 15px;
   color: #2c3e50;
+  
 }
 
 .detection-container {

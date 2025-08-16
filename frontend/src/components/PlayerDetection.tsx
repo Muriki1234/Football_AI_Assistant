@@ -15,6 +15,8 @@ interface PlayerDetectionProps {
   onPlayerSelected: (playerId: number, coordinates: { x: number, y: number }) => void;
   isAnalyzing: boolean;
   onBack?: () => void; // 添加返回按钮回调
+  onImageLoaded?: () => void; // 图像加载完成回调
+  onContinue: () => void;   // ✅ 添加
 }
 
 const PlayerDetection: React.FC<PlayerDetectionProps> = (props) => {
@@ -79,6 +81,7 @@ const PlayerDetection: React.FC<PlayerDetectionProps> = (props) => {
   });
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [isImageFullyLoaded, setIsImageFullyLoaded] = useState(false);
   
   const handlePlayerClick = (playerId: number) => {
     if (!playersData) return;
