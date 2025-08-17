@@ -1,0 +1,31 @@
+{
+  "envId": "cloud1-2g1ltb323fb30dca",
+  "version": "2.0",
+  "framework": {
+    "name": "react",
+    "plugins": {
+      "client": {
+        "use": "@cloudbase/framework-plugin-website",
+        "inputs": {
+          "buildCommand": "cd frontend && npm install && npm run build",
+          "outputPath": "frontend/build",
+          "cloudPath": "/",
+          "ignore": [
+            ".git",
+            "node_modules",
+            "src",
+            "public",
+            "*.md",
+            "backend"
+          ],
+          "envVariables": {
+            "NODE_ENV": "production"
+          }
+        }
+      }
+    }
+  },
+  "cloudrun": {
+    "name": "flask-api"
+  }
+}

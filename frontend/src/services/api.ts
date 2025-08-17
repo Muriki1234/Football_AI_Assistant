@@ -1,5 +1,24 @@
 // API服务模块 - 与Flask后端通信
-const API_BASE_URL = 'http://localhost:5001'; // Flask默认端口
+const getApiBaseUrl = () => {
+  // 优先使用环境变量
+  if (process.env.REACT_APP_API_URL) {
+    return process.env.REACT_APP_API_URL;
+  }
+  
+  // 根据环境选择默认URL
+  if (process.env.NODE_ENV === 'production') {
+    // 生产环境 - 需要替换为实际的CloudBase函数URL
+    return 'https://your-env-id.service.tcloudbase.com/flask-api';
+  }
+  
+  return 'http://localhost:5001'; // 开发环境
+};
+
+const API_BASE_URL = getApiBaseUrl();
+
+// 添加调试信息
+console.log('Current API Base URL:', API_BASE_URL);
+console.log('Environment:', process.env.NODE_ENV);
 
 // 通用的错误处理函数
 const handleApiError = async (response: Response) => {
@@ -34,7 +53,8 @@ export const analyzeFrame = async (videoFile: File, timeInSeconds: number) => {
       fileName: videoFile.name,
       fileSize: videoFile.size,
       fileType: videoFile.type,
-      timeInSeconds
+      timeInSeconds,
+      apiUrl: API_BASE_URL
     });
 
     const formData = new FormData();
@@ -93,7 +113,8 @@ export const analyzeWithGemini = async (
       fileType: videoFile.type,
       timeInSeconds,
       playerCoordinates,
-      promptLength: prompt.length
+      promptLength: prompt.length,
+      apiUrl: API_BASE_URL
     });
 
     const formData = new FormData();
@@ -139,9 +160,12 @@ export const analyzeWithGemini = async (
 
 export const checkHealth = async () => {
   try {
+    console.log('检查后端健康状态:', API_BASE_URL);
     const response = await fetch(`${API_BASE_URL}/health`);
     await handleApiError(response);
-    return response.json();
+    const result = await response.json();
+    console.log('健康检查结果:', result);
+    return result;
   } catch (error) {
     console.error('健康检查错误:', error);
     throw error;

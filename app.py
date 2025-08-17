@@ -21,15 +21,20 @@ genai.configure(api_key=GEMINI_API_KEY)
 # 使用临时文件夹代替永久存储
 TEMP_FOLDER = tempfile.mkdtemp()
 app = Flask(__name__)
-# 配置CORS
+
+# 配置CORS - 适配CloudBase
 CORS(app, resources={
     r"/*": {
-        "origins": ["http://localhost:3000"],
+        "origins": [
+            "http://localhost:3000",
+            "https://*.tcloudbaseapp.com",
+            "https://*.tcb.qcloud.la",
+            "https://cloud1-2g1ltb323fb30dca-1374423658.tcloudbaseapp.com"  # 您的前端域名
+        ],
         "methods": ["GET", "POST", "OPTIONS"],
-        "allow_headers": ["Content-Type"]
+        "allow_headers": ["Content-Type", "Authorization"]
     }
 })
-
 # Roboflow 模型配置
 API_KEY = os.getenv("ROBOFLOW_API_KEY")
 MODEL_ID = "football-players-detection-3zvbc-lkn9q"
@@ -437,8 +442,7 @@ def cleanup_temp_folder():
 
 atexit.register(cleanup_temp_folder)
 
+# 云托管适配
 if __name__ == "__main__":
-    print(f"临时文件夹: {TEMP_FOLDER}")
-    print("单帧分析和AI分析功能已启用")
-    # 使用5001端口避免与AirPlay冲突
-    app.run(debug=True, port=5001)
+    port = int(os.environ.get('PORT', 8080))  # 云托管使用8080端口
+    app.run(host='0.0.0.0', port=port, debug=False)
