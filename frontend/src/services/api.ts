@@ -8,7 +8,7 @@ const getApiBaseUrl = () => {
   // 根据环境选择默认URL
   if (process.env.NODE_ENV === 'production') {
     // 生产环境 - 需要替换为实际的CloudBase函数URL
-    return 'https://your-env-id.service.tcloudbase.com/flask-api';
+    return process.env.REACT_APP_API_URL;
   }
   
   return 'http://localhost:5001'; // 开发环境

@@ -86,6 +86,10 @@ def upload_to_supabase(file_path: str, target_name: str) -> str:
         print(f"上传过程中出错: {e}")
         raise e
 
+@app.route("/test_post", methods=["POST"])
+def test_post():
+    return {"message": "Hello World"}, 200
+
 @app.route("/frame_analysis")
 def frame_analysis():
     """渲染单帧分析页面"""
@@ -99,6 +103,7 @@ def index():
 @app.route("/analyze_frame", methods=["POST"])
 def analyze_frame():
     """分析视频的单帧"""
+    print("收到分析请求")
     if request.method == "POST":
         file = request.files.get("video")
         if not file:
@@ -444,5 +449,5 @@ atexit.register(cleanup_temp_folder)
 
 # 云托管适配
 if __name__ == "__main__":
-    port = int(os.environ.get('PORT', 8080))  # 云托管使用8080端口
+    port = int(os.environ.get('PORT', 5001))  # 云托管使用8080端口
     app.run(host='0.0.0.0', port=port, debug=False)

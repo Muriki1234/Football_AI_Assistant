@@ -14,8 +14,8 @@ const HomePage: React.FC<HomePageProps> = ({ onGetStarted }) => {
     },
     {
       icon: Target,
-      title: '选择帧数',
-      description: '精确选择需要分析的关键时刻'
+      title: '选择球员',
+      description: '精确选择出想要被分析的球员'
     },
     {
       icon: Brain,

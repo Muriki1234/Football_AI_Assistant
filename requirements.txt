@@ -1,6 +1,7 @@
 flask==2.0.1
+werkzeug==2.0.3
 flask-cors==3.0.10
-opencv-python-headless==4.5.3.56
+opencv-python==4.5.3.56
 numpy==1.21.2
 roboflow==0.2.29
 supabase==0.7.1
