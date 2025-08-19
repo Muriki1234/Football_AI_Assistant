@@ -16,40 +16,53 @@ load_dotenv()
 
 # 配置Gemini API
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-genai.configure(api_key=GEMINI_API_KEY)
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
 
 # 使用临时文件夹代替永久存储
 TEMP_FOLDER = tempfile.mkdtemp()
 app = Flask(__name__)
 
-# 配置CORS - 适配CloudBase
+# 配置CORS - Railway域名通常是 *.railway.app
 CORS(app, resources={
     r"/*": {
         "origins": [
             "http://localhost:3000",
+            "https://*.railway.app",
             "https://*.tcloudbaseapp.com",
-            "https://*.tcb.qcloud.la",
             "https://cloud1-2g1ltb323fb30dca-1374423658.tcloudbaseapp.com"  # 您的前端域名
         ],
         "methods": ["GET", "POST", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"]
     }
 })
+
+# 增加文件上传大小限制 (Railway支持更大文件)
+app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500MB
+
 # Roboflow 模型配置
 API_KEY = os.getenv("ROBOFLOW_API_KEY")
 MODEL_ID = "football-players-detection-3zvbc-lkn9q"
 MODEL_VERSION = 1
 
-rf = Roboflow(api_key=API_KEY)
-project = rf.workspace().project(MODEL_ID)
-model = project.version(MODEL_VERSION).model
+if API_KEY:
+    rf = Roboflow(api_key=API_KEY)
+    project = rf.workspace().project(MODEL_ID)
+    model = project.version(MODEL_VERSION).model
+else:
+    model = None
+    print("Warning: ROBOFLOW_API_KEY not found")
 
 # Supabase 配置
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 BUCKET_NAME = "videos"
 
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+if SUPABASE_URL and SUPABASE_KEY:
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+else:
+    supabase = None
+    print("Warning: Supabase credentials not found")
 
 def cleanup_file(file_path):
     """安全删除文件"""
@@ -426,14 +439,14 @@ def analyze_with_gemini():
             cleanup_file(analysis_path)
 
 
-@app.route("/health")
-def health_check():
-    """健康检查端点"""
-    return jsonify({
-        "status": "healthy", 
-        "temp_folder": TEMP_FOLDER,
-        "gemini_enabled": True
-    })
+# @app.route("/health")
+# def health_check():
+#     """健康检查端点"""
+#     return jsonify({
+#         "status": "healthy", 
+#         "temp_folder": TEMP_FOLDER,
+#         "gemini_enabled": True
+#     })
 
 # 应用关闭时清理临时文件夹
 import atexit
@@ -448,6 +461,19 @@ def cleanup_temp_folder():
 atexit.register(cleanup_temp_folder)
 
 # 云托管适配
+@app.route("/health")
+def health_check():
+    """健康检查端点"""
+    return jsonify({
+        "status": "healthy", 
+        "temp_folder": TEMP_FOLDER,
+        "gemini_enabled": bool(GEMINI_API_KEY),
+        "roboflow_enabled": bool(API_KEY),
+        "supabase_enabled": bool(supabase),
+        "platform": "Railway"
+    })
+
+# Railway适配
 if __name__ == "__main__":
-    port = int(os.environ.get('PORT', 5001))  # 云托管使用8080端口
+    port = int(os.environ.get('PORT', 5001))  # Railway使用PORT环境变量
     app.run(host='0.0.0.0', port=port, debug=False)
