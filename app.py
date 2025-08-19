@@ -1,5 +1,10 @@
 import os
-import cv2
+try:
+    import cv2
+    print("OpenCV导入成功")
+except Exception as e:
+    print(f"OpenCV导入失败: {e}")
+    cv2 = None
 import numpy as np
 import json
 from flask import Flask, request, render_template, jsonify
@@ -116,6 +121,9 @@ def index():
 @app.route("/analyze_frame", methods=["POST"])
 def analyze_frame():
     """分析视频的单帧"""
+    if cv2 is None:
+        return jsonify({"error": "OpenCV未正确安装", "success": False}), 500
+    
     print("收到分析请求")
     if request.method == "POST":
         file = request.files.get("video")
