@@ -475,5 +475,5 @@ def health_check():
 
 # Railway适配
 if __name__ == "__main__":
-    port = int(os.environ.get('PORT', 5001))  # Railway使用PORT环境变量
+    port = int(os.environ.get('PORT', 5001))  # Railway会设置PORT环境变量
     app.run(host='0.0.0.0', port=port, debug=False)
